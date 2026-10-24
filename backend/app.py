@@ -26,9 +26,19 @@ app = FastAPI(
 )
 
 # Configure CORS
-FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "*")
-origins = [origin.strip() for origin in FRONTEND_ORIGIN.split(",") if origin.strip()]
-if not origins or "*" in origins:
+DEFAULT_ORIGINS = [
+    "https://hackerrankerorchestrate-frontend.vercel.app",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+]
+FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "")
+env_origins = [origin.strip() for origin in FRONTEND_ORIGIN.split(",") if origin.strip()]
+origins = list(dict.fromkeys(DEFAULT_ORIGINS + env_origins))
+if "*" in env_origins or "*" in origins:
     origins = ["*"]
 
 app.add_middleware(

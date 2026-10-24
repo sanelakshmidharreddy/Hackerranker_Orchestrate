@@ -1,13 +1,15 @@
 /**
  * Ghost Data Still Exists — Frontend Configuration
- * Resolves the backend API base URL from multiple flexible sources:
- * 1. window.BACKEND_URL (e.g. injected or declared in index.html)
- * 2. URL Query parameter (?api=https://... or ?backend=https://...)
- * 3. LocalStorage persistence (allows one-time configuration in browser)
- * 4. Localhost default (http://localhost:8000)
+ * Connects to Render backend in production and localhost:8000 in development.
  */
 
 (function() {
+  const PRODUCTION_BACKEND_URL = "https://hackerranker-orchestrate.onrender.com";
+  const LOCAL_BACKEND_URL = "http://localhost:8000";
+
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const defaultBase = isLocal ? LOCAL_BACKEND_URL : PRODUCTION_BACKEND_URL;
+
   const urlParams = new URLSearchParams(window.location.search);
   const paramApi = urlParams.get("api") || urlParams.get("backend");
   if (paramApi) {
@@ -18,15 +20,13 @@
 
   const storedApi = (function() {
     try {
-      return localStorage.getItem("GHOST_DATA_API_BASE");
+      const val = localStorage.getItem("GHOST_DATA_API_BASE");
+      return (val && val.trim()) ? val.trim() : null;
     } catch (e) {
       return null;
     }
   })();
 
-  const defaultLocal = (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-    ? "http://localhost:8000"
-    : "";
-
-  window.API_BASE = window.BACKEND_URL || paramApi || storedApi || window.API_BASE || defaultLocal;
+  // Use explicit environment/param/stored override if present, otherwise automatic environment default
+  window.API_BASE = (window.BACKEND_URL || paramApi || storedApi || window.API_BASE || defaultBase).replace(/\/$/, "");
 })();
