@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ghost Data Still Exists — Forensic Deletion Audit Explorer</title>
+  <meta name="description" content="Independent AI-powered deletion-audit explorer proving personal data deletion state from evidence without relying on false dashboard claims.">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="logo-badge">🛡️</div>
+        <div>
+          <h1>Ghost Data Still Exists</h1>
+          <p>Independent Deletion-Audit & Forensic Evidence Explorer</p>
+        </div>
+      </div>
+      <div class="header-meta">
+        <div class="badge-mode">
+          <span class="status-dot"></span>
+          READ-ONLY AUDITOR
+        </div>
+      </div>
+    </header>
+
+    <!-- Metrics Grid -->
+    <section class="summary-grid" id="summaryGrid" aria-label="Audit summary metrics">
+      <div class="metric-card">
+        <div class="metric-label">Total Evaluated Cases</div>
+        <div class="metric-value" id="valTotalCases">--</div>
+        <div class="metric-desc">Static dataset cutoffs at audit_at</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">Audited Complete</div>
+        <div class="metric-value" style="color: var(--status-complete);" id="valComplete">--</div>
+        <div class="metric-desc">Evidence-backed compliant states</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">Audited Incomplete</div>
+        <div class="metric-value" style="color: var(--status-incomplete);" id="valIncomplete">--</div>
+        <div class="metric-desc">Violations & recreation risks found</div>
+      </div>
+
+      <div class="metric-card alert-card">
+        <div class="metric-label">False Claim Discrepancies</div>
+        <div class="metric-value" style="color: #fb7185;" id="valFalseComplete">--</div>
+        <div class="metric-desc danger-desc">Claimed COMPLETE, but data survived ($2.4M Risk)</div>
+      </div>
+
+      <div class="metric-card">
+        <div class="metric-label">Not Applicable</div>
+        <div class="metric-value" style="color: var(--status-na);" id="valNotApplicable">--</div>
+        <div class="metric-desc">Non-deletion authorization requests</div>
+      </div>
+    </section>
+
+    <!-- Controls Bar -->
+    <section class="controls-bar" aria-label="Case search and filtering">
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Search by case ID or email address..." autocomplete="off">
+      </div>
+
+      <div class="filter-tabs" id="filterTabs">
+        <button class="tab-btn active" data-status="ALL" id="tabAll">All Cases</button>
+        <button class="tab-btn" data-status="COMPLETE" id="tabComplete">Complete</button>
+        <button class="tab-btn" data-status="INCOMPLETE" id="tabIncomplete">Incomplete</button>
+        <button class="tab-btn" data-status="NOT_APPLICABLE" id="tabNA">Not Applicable</button>
+      </div>
+    </section>
+
+    <!-- Cases Table -->
+    <main class="table-card" aria-label="Audit case list">
+      <div class="table-responsive">
+        <table id="casesTable">
+          <thead>
+            <tr>
+              <th>Case ID</th>
+              <th>Subject Email</th>
+              <th>Workflow Claim</th>
+              <th>Audited True State</th>
+              <th>Findings Count</th>
+              <th>Audit Cutoff</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="casesTableBody">
+            <tr>
+              <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-dim);">
+                Loading audit cases...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+
+  <!-- Detail Slide-out Drawer -->
+  <div class="drawer-backdrop" id="drawerBackdrop" aria-hidden="true">
+    <aside class="drawer-panel" id="drawerPanel" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+      <div class="drawer-header">
+        <div>
+          <h2 id="drawerTitle" style="font-size: 1.25rem; font-weight: 700; color: #ffffff;">Case Details</h2>
+          <span id="drawerEmail" style="font-size: 0.8125rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;"></span>
+        </div>
+        <button class="drawer-close" id="drawerCloseBtn" aria-label="Close case details">&times;</button>
+      </div>
+
+      <div class="drawer-body" id="drawerBody">
+        <!-- Injected via JavaScript -->
+      </div>
+    </aside>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

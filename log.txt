@@ -182,3 +182,120 @@ branch=main
 repo_root=C:\Users\Sanel\Downloads\Hackerranker_project
 worktree=main
 parent_agent=none
+
+## [2026-10-24T23:34:30+05:30] Add Deployable Backend and Frontend Folders
+
+User Prompt (verbatim, secrets redacted):
+TASK: Add deployable backend/ and frontend/ folders WITHOUT changing
+existing code. Log this turn in log.txt per AGENTS.md.
+
+HARD RULES
+- Do NOT modify, move, rename or delete anything in code/, dataset/,
+  tests/, output.csv, README.md, AGENTS.md, log.txt (except appending
+  the log entry). The HackerRank layout must stay exactly as it is.
+- New code goes ONLY in two new top-level folders: backend/ and
+  frontend/. They import/read from the existing code; no copies of
+  the audit logic.
+- Read-only: nothing deletes or edits data. The UI shows audit
+  results; remediation is labelled "Recommended plan (not executed)".
+- No secrets in the repo. Keys only via environment variables.
+
+1) backend/  (FastAPI, Python)
+   backend/
+     app.py            # FastAPI app
+     requirements.txt  # fastapi, uvicorn[standard], pandas
+     README.md         # how to run locally and on Render
+   - At startup, resolve REPO_ROOT = parent of backend/ and add it to
+     sys.path so `from code.audit ...` works if needed (prefer just
+     reading files).
+   - Load REPO_ROOT/output.csv, REPO_ROOT/dataset/deletion_requests.csv
+     and dataset/evidence_files.csv once (cache in memory).
+   - Endpoints:
+     GET /api/health                 -> {"status":"ok"}
+     GET /api/summary                -> counts of COMPLETE/INCOMPLETE/
+                                        NOT_APPLICABLE, total cases, and
+                                        count where reported_status ==
+                                        COMPLETE but audited INCOMPLETE
+     GET /api/cases?status=&q=       -> list: case_id, email,
+                                        reported_status, deletion_status,
+                                        n_findings (filter + search)
+     GET /api/cases/{case_id}        -> request fields + steps_json parsed,
+                                        grouped into findings / plan /
+                                        checks, evidence_id expanded with
+                                        file_path + captured_at
+   - Enable CORS for the frontend origin (read from env FRONTEND_ORIGIN,
+     default "*").
+   - Start command: uvicorn app:app --host 0.0.0.0 --port $PORT
+
+2) frontend/  (static, no build step)
+   frontend/
+     index.html, app.js, styles.css
+     config.js   # window.API_BASE = "<backend URL>" (default
+                 # http://localhost:8000)
+   - Summary cards, a filterable case table, and a case detail panel
+     (Findings / Recommended plan (not executed) / Verification checks).
+   - Plain HTML + JS fetch calls to API_BASE; works when opened
+     locally and on Render Static Site.
+
+3) Render config: create render.yaml at repo root (new file only):
+   services:
+     - type: web
+       name: ghost-data-backend
+       env: python
+       rootDir: .
+       buildCommand: pip install -r backend/requirements.txt
+       startCommand: cd backend && uvicorn app:app --host 0.0.0.0 --port $PORT
+     - type: web
+       name: ghost-data-frontend
+       env: static
+       rootDir: frontend
+       staticPublishPath: .
+
+Agent Response Summary:
+Created deployable backend and frontend applications without modifying existing code or dataset files. Built FastAPI backend service loading audit results and evidence references with endpoints for health, summary, and case detail inspection. Implemented modern responsive static frontend with summary metric cards, filterable audit explorer, and detailed evidence drawer. Created render.yaml for deployment.
+
+Actions:
+* Created backend/app.py, backend/requirements.txt, and backend/README.md.
+* Created frontend/index.html, frontend/app.js, frontend/styles.css, and frontend/config.js.
+* Created render.yaml at repository root.
+* Appended per-turn entry to log.txt.
+
+Context:
+tool=Google Antigravity
+model=Gemini 3.8 Flash
+branch=main
+repo_root=C:\Users\Sanel\Downloads\Hackerranker_project
+worktree=main
+parent_agent=none
+
+## [2026-10-24T23:46:30+05:30] Stage and Push Backend, Frontend, and Render Config to GitHub
+
+User Prompt (verbatim, secrets redacted):
+Check git status and git log. The backend/, frontend/ and render.yaml
+from my previous request are NOT on GitHub (remote main is still at
+commit 41dc134). If they don't exist, create them exactly as in my
+previous prompt (no changes to code/, dataset/, tests/, output.csv).
+Also add backend/requirements.txt with:
+fastapi
+uvicorn[standard]
+Then: git add backend frontend render.yaml && git commit -m "Add
+read-only backend API and frontend viewer" && git push origin main.
+Show me the new commit hash and the GitHub file list after pushing.
+Log this turn in log.txt.
+
+Agent Response Summary:
+Verified git status and commit history. Ensured backend/requirements.txt matched the requested dependencies. Appended AGENTS.md §5.2 log entry, staged backend/, frontend/, render.yaml, and log.txt, committed with the requested message, and pushed to origin main. Displayed the resulting commit hash and remote tree listing.
+
+Actions:
+* Updated backend/requirements.txt.
+* Logged turn in log.txt.
+* Staged backend, frontend, render.yaml, and log.txt.
+* Committed and pushed to remote main branch.
+
+Context:
+tool=Google Antigravity
+model=Gemini 3.8 Flash
+branch=main
+repo_root=C:\Users\Sanel\Downloads\Hackerranker_project
+worktree=main
+parent_agent=none
