@@ -50,6 +50,21 @@ function setupEventListeners() {
   window.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeDrawer();
   });
+
+  // Config backend URL prompt
+  const btnConfigApi = document.getElementById("btnConfigApi");
+  if (btnConfigApi) {
+    btnConfigApi.addEventListener("click", () => {
+      const current = window.API_BASE || "(same domain / relative)";
+      const updated = prompt("Enter deployed backend URL (e.g. https://ghost-data-backend.onrender.com):", current);
+      if (updated !== null && updated.trim()) {
+        try {
+          localStorage.setItem("GHOST_DATA_API_BASE", updated.trim().replace(/\/$/, ""));
+          window.location.reload();
+        } catch (e) {}
+      }
+    });
+  }
 }
 
 async function fetchSummary() {
