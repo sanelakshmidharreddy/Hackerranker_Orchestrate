@@ -3,7 +3,11 @@
  * Connects to backend API and renders metrics, case lists, and forensic audit details.
  */
 
-const API_BASE = (window.API_BASE || "").replace(/\/$/, "");
+function getApiBase() {
+  const isLocal = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+  const defaultUrl = isLocal ? "http://localhost:8000" : "https://hackerranker-orchestrate.onrender.com";
+  return (window.API_BASE || defaultUrl).replace(/\/$/, "");
+}
 
 let currentStatusFilter = "ALL";
 let currentSearchQuery = "";
@@ -69,7 +73,7 @@ function setupEventListeners() {
 
 async function fetchSummary() {
   try {
-    const res = await fetch(`${API_BASE}/api/summary`);
+    const res = await fetch(`${getApiBase()}/api/summary`);
     if (!res.ok) throw new Error("Failed to load summary");
     const data = await res.json();
 
@@ -86,7 +90,7 @@ async function fetchSummary() {
 async function fetchCases() {
   const tbody = document.getElementById("casesTableBody");
   try {
-    const res = await fetch(`${API_BASE}/api/cases`);
+    const res = await fetch(`${getApiBase()}/api/cases`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     allCasesCache = await res.json();
     renderCasesTable();
@@ -95,7 +99,7 @@ async function fetchCases() {
     tbody.innerHTML = `
       <tr>
         <td colspan="7" style="text-align: center; padding: 40px; color: #fb7185;">
-          Unable to connect to backend at <code>${API_BASE || window.location.origin}</code>.<br>
+          Unable to connect to backend at <code>${getApiBase()}</code>.<br>
           Please make sure the backend is running: <code>cd backend && uvicorn app:app --port 8000</code>
         </td>
       </tr>
@@ -188,7 +192,7 @@ async function openCaseDetail(caseId) {
   backdrop.classList.add("open");
 
   try {
-    const res = await fetch(`${API_BASE}/api/cases/${caseId}`);
+    const res = await fetch(`${getApiBase()}/api/cases/${caseId}`);
     if (!res.ok) throw new Error("Failed to load case detail");
     const c = await res.json();
 
