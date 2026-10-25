@@ -89,10 +89,8 @@ def load_dataset_and_results():
                     }
     DATA["evidence_files"] = evidence_files
 
-    # 2. Load requests (try deletion_requests.csv, fallback to sample_deletion_requests.csv)
+    # 2. Load requests from deletion_requests.csv ONLY (no sample fallback)
     requests_path = REPO_ROOT / "dataset" / "deletion_requests.csv"
-    if not requests_path.exists():
-        requests_path = REPO_ROOT / "dataset" / "sample_deletion_requests.csv"
 
     requests_by_id = {}
     if requests_path.exists():
@@ -103,17 +101,7 @@ def load_dataset_and_results():
                 if cid:
                     requests_by_id[cid] = row
 
-    # Also load sample_deletion_requests.csv if different
-    sample_requests_path = REPO_ROOT / "dataset" / "sample_deletion_requests.csv"
-    if sample_requests_path.exists() and sample_requests_path != requests_path:
-        with open(sample_requests_path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                cid = row.get("case_id")
-                if cid and cid not in requests_by_id:
-                    requests_by_id[cid] = row
-
-    # 3. Load audit outputs from output.csv
+    # 3. Load audit outputs from root output.csv ONLY (no sample fallback)
     output_path = REPO_ROOT / "output.csv"
     outputs_by_id = {}
     if output_path.exists():
@@ -124,19 +112,12 @@ def load_dataset_and_results():
                 if cid:
                     outputs_by_id[cid] = row
 
-    # Fallback to dataset/sample_output.csv if output.csv missing entries
-    sample_output_path = REPO_ROOT / "dataset" / "sample_output.csv"
-    if sample_output_path.exists():
-        with open(sample_output_path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                cid = row.get("case_id")
-                if cid and cid not in outputs_by_id:
-                    outputs_by_id[cid] = row
-
-    # 4. Merge into unified case store
+    # 4. Merge into unified case store.
+    # Only include case_ids that appear in deletion_requests.csv.
+    # Output rows for unknown case_ids (e.g. stale sample rows) are ignored
+    # so that total_cases == 518 exactly.
     all_case_ids = sorted(
-        set(requests_by_id.keys()) | set(outputs_by_id.keys()),
+        set(requests_by_id.keys()),
         key=case_sort_key,
     )
 

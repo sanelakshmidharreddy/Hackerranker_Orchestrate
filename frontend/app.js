@@ -13,11 +13,78 @@ let currentStatusFilter = "ALL";
 let currentSearchQuery = "";
 let allCasesCache = [];
 
+// ── Cold-start / retry state ─────────────────────────────────────────────────
+const FETCH_TIMEOUT_MS   = 20_000;  // 20 s per request
+const RETRY_INTERVAL_MS  = 5_000;   // retry every 5 s
+const RETRY_DEADLINE_MS  = 90_000;  // give up after 90 s total
+
+/**
+ * Fetch with an AbortController timeout and automatic cold-start retries.
+ * Shows a "Waking up…" banner in #coldStartBanner while retrying.
+ * After RETRY_DEADLINE_MS, shows a permanent error with a Retry button.
+ *
+ * @param {string} url
+ * @returns {Promise<Response>}
+ */
+async function fetchWithRetry(url) {
+  const started = Date.now();
+  let attempt = 0;
+
+  while (true) {
+    attempt++;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      clearTimeout(timer);
+      hideColdStartBanner();
+      return res;
+    } catch (err) {
+      clearTimeout(timer);
+      const elapsed = Date.now() - started;
+
+      if (elapsed >= RETRY_DEADLINE_MS) {
+        hideColdStartBanner();
+        throw new Error(`TIMEOUT_FINAL:${url}`);
+      }
+
+      // Show / update the waking-up banner
+      showColdStartBanner(elapsed);
+      // Wait for the retry interval before next attempt
+      await new Promise(resolve => setTimeout(resolve, RETRY_INTERVAL_MS));
+    }
+  }
+}
+
+function showColdStartBanner(elapsedMs) {
+  let banner = document.getElementById("coldStartBanner");
+  if (!banner) {
+    banner = document.createElement("div");
+    banner.id = "coldStartBanner";
+    banner.style.cssText = [
+      "position:fixed","top:0","left:0","right:0","z-index:9999",
+      "background:#7c3aed","color:#fff","text-align:center",
+      "padding:10px 16px","font-size:0.9rem","font-family:inherit"
+    ].join(";");
+    document.body.prepend(banner);
+  }
+  const secs = Math.round(elapsedMs / 1000);
+  banner.textContent =
+    `⏳ Waking up the audit server (up to 60s)… ${secs}s elapsed. Please wait.`;
+}
+
+function hideColdStartBanner() {
+  const banner = document.getElementById("coldStartBanner");
+  if (banner) banner.remove();
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   fetchSummary();
   fetchCases();
   setupEventListeners();
 });
+
 
 function setupEventListeners() {
   // Search input with debounce
@@ -73,7 +140,7 @@ function setupEventListeners() {
 
 async function fetchSummary() {
   try {
-    const res = await fetch(`${getApiBase()}/api/summary`);
+    const res = await fetchWithRetry(`${getApiBase()}/api/summary`);
     if (!res.ok) throw new Error("Failed to load summary");
     const data = await res.json();
 
@@ -87,25 +154,34 @@ async function fetchSummary() {
   }
 }
 
+
 async function fetchCases() {
   const tbody = document.getElementById("casesTableBody");
   try {
-    const res = await fetch(`${getApiBase()}/api/cases`);
+    const res = await fetchWithRetry(`${getApiBase()}/api/cases`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     allCasesCache = await res.json();
     renderCasesTable();
   } catch (err) {
     console.error("Error loading cases:", err);
+    const apiBase = getApiBase();
+    const isFinal = err.message.startsWith("TIMEOUT_FINAL:");
+    const msg = isFinal
+      ? `Could not reach the audit server after 90 s.<br>
+         Backend URL: <code>${apiBase}</code><br>
+         <button onclick="window.location.reload()" style="margin-top:12px;padding:8px 18px;background:#7c3aed;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:0.9rem;">↺ Retry</button>`
+      : `Unable to connect to backend at <code>${apiBase}</code>.<br>
+         Please make sure the backend is running: <code>cd backend &amp;&amp; uvicorn app:app --port 8000</code>`;
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align: center; padding: 40px; color: #fb7185;">
-          Unable to connect to backend at <code>${getApiBase()}</code>.<br>
-          Please make sure the backend is running: <code>cd backend && uvicorn app:app --port 8000</code>
+        <td colspan="7" style="text-align:center;padding:40px;color:#fb7185;">
+          ${msg}
         </td>
       </tr>
     `;
   }
 }
+
 
 function renderCasesTable() {
   const tbody = document.getElementById("casesTableBody");
