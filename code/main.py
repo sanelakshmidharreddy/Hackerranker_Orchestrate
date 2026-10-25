@@ -112,6 +112,9 @@ def process_case(
     finding_steps = [s for s in steps if s.phase == "FINDING"]
     if finding_steps:
         deletion_status = "INCOMPLETE"
+    elif getattr(case, "reported_status", "") == "NOT_STARTED":
+        # Cases with workflow_claim NOT_STARTED should never be COMPLETE.
+        deletion_status = "INCOMPLETE"
     else:
         deletion_status = "COMPLETE"
 

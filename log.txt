@@ -418,3 +418,117 @@ branch=main
 repo_root=C:\Users\Sanel\Downloads\Hackerranker_project
 worktree=main
 parent_agent=none
+
+## [2026-10-25T10:52:08Z] fix: viewer shows only evaluated cases, handle cold start
+
+User Prompt (verbatim, secrets redacted):
+Fix the read-only viewer. Only edit backend/app.py and frontend/app.js.
+Do not touch code/, dataset/, tests/, output.csv. Log this turn in log.txt.
+1. backend/app.py: load ONLY dataset/deletion_requests.csv and root output.csv.
+   Remove fallbacks that merge sample_deletion_requests.csv and dataset/sample_output.csv.
+   /api/summary total must equal 518.
+2. frontend/app.js: handle Render cold start. Show 'Waking up the audit server (up to 60s)...'
+   retry every 5s for up to 90s, then show clear error with backend URL and Retry button.
+   Use AbortController with 20s timeout per request.
+3. Test locally, commit, push, show commit hash.
+
+Agent Response Summary:
+Removed sample fallback merges from load_dataset_and_results() in backend/app.py:
+now loads only dataset/deletion_requests.csv and root output.csv, and restricts
+the case index to deletion_requests.csv keys only so total_cases == 518 exactly.
+Added fetchWithRetry() in frontend/app.js with AbortController (20s timeout per attempt),
+5s retry interval, 90s deadline, a purple fixed top-banner showing elapsed seconds while
+the server wakes up, and a final error row with the backend URL and a Retry button.
+Smoke-tested locally (total_cases=518, case_33 found=True). Committed and pushed.
+
+Actions:
+* backend/app.py edited: removed sample fallbacks; restricted case index to deletion_requests.csv keys
+* frontend/app.js edited: added fetchWithRetry(), showColdStartBanner(), hideColdStartBanner()
+* git commit 55888bb: fix: viewer shows only evaluated cases, handle cold start
+* git push origin main (ee86238..55888bb)
+
+Context:
+tool=Antigravity
+model=Claude Sonnet 4.6 (Thinking)
+branch=main
+repo_root=c:\Users\Sanel\Downloads\Hackerranker_project
+worktree=main
+parent_agent=none
+
+
+## [2026-10-25T11:24:23Z] Fix Dashboard End-to-End: Audit Execution, Field Mapping, and Summary Cards
+
+User Prompt (verbatim, secrets redacted):
+The dashboard is broken. Total Evaluated Cases shows 518, but Audited Complete, Audited Incomplete, False Claim Discrepancies, and Not Applicable all show 0. Every row in the table shows Audited True State = "UNKNOWN" and Findings Count = 0. The audit results are not reaching the UI. Fix it end to end:
+
+1. BACKEND CONNECTION
+- Check the Backend URL the frontend uses. The frontend is deployed on Vercel, so it must call the deployed backend URL, not localhost.
+- Read it from an environment variable (e.g., NEXT_PUBLIC_API_URL / VITE_API_URL) and add a clear error banner in the UI if the backend call fails, instead of silently showing UNKNOWN.
+- Make sure CORS on the backend allows the Vercel domain.
+
+2. AUDIT MUST ACTUALLY RUN
+- Confirm the backend runs the deletion-audit evaluation for every case (using the audit_at cutoff) and returns for each case: case_id, subject_email, workflow_claim, audited_true_state, findings_count, findings[], audit_cutoff.
+- audited_true_state must be one of: COMPLETE, INCOMPLETE, NOT_APPLICABLE. Never return UNKNOWN for a case that has data.
+
+3. FIELD MAPPING
+- Make the frontend field names and enum casing exactly match the backend response. Normalize with .toUpperCase() before comparing.
+- Only fall back to UNKNOWN if the field is truly missing, and log a console warning with the case_id when that happens.
+
+4. SUMMARY CARDS (compute from data, no hardcoded values)
+- Audited Complete = count where audited_true_state == COMPLETE
+- Audited Incomplete = count where audited_true_state == INCOMPLETE
+- Not Applicable = count where audited_true_state == NOT_APPLICABLE
+- False Claim Discrepancies = count where workflow_claim == COMPLETE AND audited_true_state == INCOMPLETE
+- Remove the hardcoded "$2.4M Risk" text. Either calculate it from the data or delete it.
+- Add a check: Complete + Incomplete + Not Applicable must equal Total. If it doesn't, show a warning.
+
+5. LOGIC SANITY
+- Cases with workflow_claim NOT_STARTED should never be COMPLETE. They should be INCOMPLETE if data still exists after the cutoff.
+- Findings Count must equal the length of the findings array shown in "Inspect Audit".
+
+6. FILTERS
+- Make sure the All Cases / Complete / Incomplete / Not Applicable filter buttons use the same audited_true_state values.
+
+After fixing, run the backend locally, call the cases endpoint, and show me the JSON for 3 sample cases plus the final card counts, so I can verify they add up to 518.
+
+Agent Response Summary:
+Resolved the dashboard data pipeline end-to-end. Generated full 518-case audit output for evaluation cases and embedded automated audit engine execution into backend/app.py as an in-process fallback if output.csv is missing. Standardized backend and frontend responses to use canonical fields (case_id, subject_email, workflow_claim, audited_true_state, findings_count, findings, audit_cutoff) alongside backward-compatible aliases, enforced NOT_STARTED logic sanity, added dynamic card computation and sanity validation checks in the UI, added explicit error and cold-start banners, and verified CORS origins.
+
+Actions:
+* Updated code/main.py logic to ensure NOT_STARTED cases with surviving data are never marked COMPLETE.
+* Generated full 518-case predictions into output.csv.
+* Updated backend/app.py with startup evaluation fallback, canonical response keys, NOT_STARTED handling, and CORS regex.
+* Updated frontend/index.html to remove hardcoded risk text and add connection error and sanity check containers.
+* Updated frontend/config.js and frontend/app.js to support NEXT_PUBLIC_API_URL / VITE_API_URL, dynamic card computation, field normalization, and UI warning banner.
+* Tested backend endpoints locally and validated that Complete (147) + Incomplete (361) + Not Applicable (10) equals 518.
+
+Context:
+tool=Google Antigravity
+model=Gemini 3.8 Flash
+branch=main
+repo_root=C:\Users\Sanel\Downloads\Hackerranker_project
+worktree=main
+parent_agent=none
+
+
+## [2026-10-25T11:31:02Z] Stage, Commit, and Push Updated Viewer and Audit Results to GitHub
+
+User Prompt (verbatim, secrets redacted):
+push all the ubdated to the git hub
+
+Agent Response Summary:
+Staged all modified files including backend/app.py, code/main.py, frontend/app.js, frontend/config.js, frontend/index.html, output.csv, and log.txt. Created a clear git commit documenting the end-to-end dashboard, audit execution, and field mapping fixes. Pushed commit to remote main branch on GitHub.
+
+Actions:
+* git add backend/app.py code/main.py frontend/app.js frontend/config.js frontend/index.html output.csv log.txt
+* git commit -m "fix: complete end-to-end audit viewer integration and updated predictions"
+* git push origin main
+
+Context:
+tool=Google Antigravity
+model=Gemini 3.8 Flash
+branch=main
+repo_root=C:\Users\Sanel\Downloads\Hackerranker_project
+worktree=main
+parent_agent=none
+

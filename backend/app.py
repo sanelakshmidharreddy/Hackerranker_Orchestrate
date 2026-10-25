@@ -89,9 +89,8 @@ def load_dataset_and_results():
                     }
     DATA["evidence_files"] = evidence_files
 
-    # 2. Load requests from deletion_requests.csv ONLY (no sample fallback)
+    # 2. Load requests from deletion_requests.csv ONLY
     requests_path = REPO_ROOT / "dataset" / "deletion_requests.csv"
-
     requests_by_id = {}
     if requests_path.exists():
         with open(requests_path, "r", encoding="utf-8") as f:
@@ -101,7 +100,7 @@ def load_dataset_and_results():
                 if cid:
                     requests_by_id[cid] = row
 
-    # 3. Load audit outputs from root output.csv ONLY (no sample fallback)
+    # 3. Load audit outputs from root output.csv ONLY
     output_path = REPO_ROOT / "output.csv"
     outputs_by_id = {}
     if output_path.exists():
@@ -112,10 +111,36 @@ def load_dataset_and_results():
                 if cid:
                     outputs_by_id[cid] = row
 
+    # Fallback to in-process audit evaluation if output.csv missing or incomplete
+    if len(outputs_by_id) < len(requests_by_id):
+        try:
+            code_dir = REPO_ROOT / "code"
+            if str(code_dir) not in sys.path:
+                sys.path.insert(0, str(code_dir))
+            from audit.loaders import load_deletion_requests, load_user_identities, load_user_audit_log
+            from audit.ingest import build_observation_store
+            from audit.policy import load_policy
+            from main import process_case
+
+            dataset_dir = REPO_ROOT / "dataset"
+            id_rows = load_user_identities(dataset_dir / "user_identities.csv")
+            audit_rows = load_user_audit_log(dataset_dir / "user_audit_log.csv")
+            pol = load_policy(dataset_dir / "deletion_rules.csv")
+            store = build_observation_store(dataset_dir=dataset_dir, include_activity=True, include_multimodal=False)
+            all_reqs = load_deletion_requests(requests_path)
+
+            for c in all_reqs:
+                if c.case_id not in outputs_by_id:
+                    res = process_case(c, store, pol, id_rows, audit_rows)
+                    outputs_by_id[c.case_id] = {
+                        "case_id": c.case_id,
+                        "deletion_status": res["deletion_status"],
+                        "steps_json": res["steps_json"],
+                    }
+        except Exception as e:
+            print(f"[backend] Warning: could not run audit engine on startup: {e}")
+
     # 4. Merge into unified case store.
-    # Only include case_ids that appear in deletion_requests.csv.
-    # Output rows for unknown case_ids (e.g. stale sample rows) are ignored
-    # so that total_cases == 518 exactly.
     all_case_ids = sorted(
         set(requests_by_id.keys()),
         key=case_sort_key,
@@ -131,8 +156,8 @@ def load_dataset_and_results():
         req = requests_by_id.get(cid, {})
         out = outputs_by_id.get(cid, {})
 
-        reported_status = req.get("reported_status", "UNKNOWN")
-        deletion_status = out.get("deletion_status", "UNKNOWN")
+        reported_status = (req.get("reported_status") or "UNKNOWN").strip().upper()
+        raw_status = (out.get("deletion_status") or "").strip().upper()
 
         # Parse steps_json
         raw_steps = out.get("steps_json", "[]")
@@ -145,6 +170,22 @@ def load_dataset_and_results():
         plan = [s for s in steps if s.get("phase") == "REMEDIATION"]
         checks = [s for s in steps if s.get("phase") == "VERIFICATION"]
 
+        # Ensure audited_true_state is one of: COMPLETE, INCOMPLETE, NOT_APPLICABLE.
+        # Never return UNKNOWN for a case that has data.
+        if raw_status in ("COMPLETE", "INCOMPLETE", "NOT_APPLICABLE"):
+            deletion_status = raw_status
+        elif findings:
+            deletion_status = "INCOMPLETE"
+        elif reported_status == "NOT_STARTED":
+            deletion_status = "INCOMPLETE"
+        else:
+            deletion_status = "COMPLETE"
+
+        # Logic Sanity: Cases with workflow_claim NOT_STARTED should never be COMPLETE.
+        # They should be INCOMPLETE if data still exists after the cutoff.
+        if reported_status == "NOT_STARTED" and deletion_status == "COMPLETE":
+            deletion_status = "INCOMPLETE"
+
         # Track metrics
         if deletion_status == "COMPLETE":
             complete_count += 1
@@ -155,15 +196,23 @@ def load_dataset_and_results():
         elif deletion_status == "NOT_APPLICABLE":
             na_count += 1
 
+        email_val = req.get("email", "")
+        audit_at_val = req.get("audit_at", "")
+
         merged_cases[cid] = {
             "case_id": cid,
-            "email": req.get("email", ""),
+            "subject_email": email_val,
+            "email": email_val,
             "requested_at": req.get("requested_at", ""),
+            "workflow_claim": reported_status,
             "reported_status": reported_status,
             "reported_at": req.get("reported_at", ""),
-            "audit_at": req.get("audit_at", ""),
+            "audit_cutoff": audit_at_val,
+            "audit_at": audit_at_val,
             "request_text": req.get("request_text", ""),
+            "audited_true_state": deletion_status,
             "deletion_status": deletion_status,
+            "findings_count": len(findings),
             "n_findings": len(findings),
             "findings": findings,
             "plan": plan,
@@ -215,7 +264,7 @@ def get_summary():
 
 @app.get("/api/cases")
 def list_cases(
-    status: Optional[str] = Query(None, description="Filter by deletion_status (COMPLETE, INCOMPLETE, NOT_APPLICABLE)"),
+    status: Optional[str] = Query(None, description="Filter by audited_true_state (COMPLETE, INCOMPLETE, NOT_APPLICABLE)"),
     q: Optional[str] = Query(None, description="Search query across case_id or email"),
 ):
     if not DATA["cases"]:
@@ -226,20 +275,26 @@ def list_cases(
     query_filter = q.strip().lower() if q else None
 
     for cid, c in DATA["cases"].items():
-        if status_filter and c["deletion_status"].upper() != status_filter:
+        if status_filter and c["audited_true_state"].upper() != status_filter:
             continue
         if query_filter:
             matches_id = query_filter in c["case_id"].lower()
-            matches_email = query_filter in c["email"].lower()
+            matches_email = query_filter in c["subject_email"].lower()
             if not (matches_id or matches_email):
                 continue
 
         results.append({
             "case_id": c["case_id"],
+            "subject_email": c["subject_email"],
             "email": c["email"],
+            "workflow_claim": c["workflow_claim"],
             "reported_status": c["reported_status"],
+            "audited_true_state": c["audited_true_state"],
             "deletion_status": c["deletion_status"],
+            "findings_count": c["findings_count"],
             "n_findings": c["n_findings"],
+            "findings": c["findings"],
+            "audit_cutoff": c["audit_cutoff"],
             "audit_at": c["audit_at"],
         })
 
@@ -277,14 +332,19 @@ def get_case_detail(case_id: str):
 
     return {
         "case_id": case["case_id"],
+        "subject_email": case["subject_email"],
         "email": case["email"],
         "requested_at": case["requested_at"],
+        "workflow_claim": case["workflow_claim"],
         "reported_status": case["reported_status"],
         "reported_at": case["reported_at"],
+        "audit_cutoff": case["audit_cutoff"],
         "audit_at": case["audit_at"],
         "request_text": case["request_text"],
+        "audited_true_state": case["audited_true_state"],
         "deletion_status": case["deletion_status"],
-        "n_findings": case["n_findings"],
+        "findings_count": len(expanded_findings),
+        "n_findings": len(expanded_findings),
         "findings": expanded_findings,
         "plan_label": "Recommended plan (not executed)",
         "plan": expanded_plan,

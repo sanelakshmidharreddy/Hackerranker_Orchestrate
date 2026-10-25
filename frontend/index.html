@@ -31,6 +31,9 @@
       </div>
     </header>
 
+    <!-- API Connection Error Banner -->
+    <div id="apiErrorBanner" style="display:none; margin-bottom: 20px; padding: 16px 20px; background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.4); border-radius: 12px; color: #fecdd3;"></div>
+
     <!-- Metrics Grid -->
     <section class="summary-grid" id="summaryGrid" aria-label="Audit summary metrics">
       <div class="metric-card">
@@ -54,7 +57,7 @@
       <div class="metric-card alert-card">
         <div class="metric-label">False Claim Discrepancies</div>
         <div class="metric-value" style="color: #fb7185;" id="valFalseComplete">--</div>
-        <div class="metric-desc danger-desc">Claimed COMPLETE, but data survived ($2.4M Risk)</div>
+        <div class="metric-desc danger-desc">Claimed COMPLETE, but data survived</div>
       </div>
 
       <div class="metric-card">
@@ -63,6 +66,9 @@
         <div class="metric-desc">Non-deletion authorization requests</div>
       </div>
     </section>
+
+    <!-- Summary Sanity Warning Banner -->
+    <div id="summaryWarning" style="display:none; margin-bottom: 16px; padding: 12px 16px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 8px; color: #fde68a; font-size: 0.875rem;"></div>
 
     <!-- Controls Bar -->
     <section class="controls-bar" aria-label="Case search and filtering">
